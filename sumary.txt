@@ -1,0 +1,25 @@
+Context: I am building a Semantic Monocular SLAM (Visual Odometry) engine using OpenCV and Python, running on the KITTI dataset (specifically Sequences 00 and 01).
+
+Current State: The engine is stable, highly accurate, and runs locally in real-time without lag. I recently transitioned away from a WebSocket/FastAPI web interface because it caused severe buffer overflows and lag (freezing at frames 112-117). The system now uses a fast, native OpenCV desktop dashboard.
+
+Architecture & Files:
+
+main.py: The core loop. It uses FastFeatureDetector and Lucas-Kanade (calcOpticalFlowPyrLK) for feature tracking. It calculates the Essential Matrix (findEssentialMat with RANSAC) and recovers the pose.
+
+dashboard.py: A custom cv2.imshow UI class (DashboardVisualizer) that combines the camera feed, a 2D bird's-eye trajectory map (Green = Estimated, Red = Ground Truth), and live telemetry (Speed, Distance, RMSE).
+
+utils.py: Contains KITTILoader to parse the image_0 folder, calib.txt (Intrinsic matrix K), and Ground Truth poses.
+
+yolo_utils.py: Contains DynamicMasker powered by YOLOv8n. It generates a black mask over cars, people, and bicycles so the optical flow only tracks static environment features.
+
+geometry_utils.py: Contains a ScaleEstimator class (triangulating road points). Note: This is currently disabled in favor of using Absolute Scale.
+
+Major Bugs Already Solved (Do not regress on these):
+
+OpenCV 9x3 Crash: findEssentialMat sometimes returned a 9x3 matrix instead of 3x3, crashing recoverPose. Fixed by strictly enforcing if E is not None and E.shape == (3, 3):.
+
+Monocular Scale Ambiguity ("Drunk Snake" Map): On sharp 90-degree turns in Seq 00, pure monocular triangulation failed, causing the trajectory to swing wildly. Fixed by injecting True Absolute Scale calculated directly from the Ground Truth poses to isolate and prove the rotational accuracy of the camera.
+
+Feature Starvation: Fixed by enforcing a refresh (cv2.cornerSubPix refinement) if tracked points drop below 1500 or every 10 frames.
+
+Network Lag: Completely eliminated by dropping the web server and using cv2.imshow directly.
